@@ -4,93 +4,76 @@ namespace App\Http\Controllers\Api\Auth;
 
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
-use Symfony\Component\HttpFoundation\Response;
 use App\Http\Controllers\Controller;
-use Illuminate\Support\Str;
-use Auth;
+use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
+    // REGISTER
     public function register(Request $request)
     {
-        $code = Str::random(5);
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'phone' => 'required|string|max:20|unique:users,phone',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|min:6',
+        ]);
 
-        return User::create([
-           
-            'name' => $request->input('name'),
-            'phone' => $request->input('phone'),
-            'email' => $request->input('email'),   
-            'password' => Hash::make($request->input('password'))
-          
+        $user = User::create([
+            'name' => $request->name,
+            'phone' => $request->phone,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+        ]);
+
+        return response([
+            'message' => 'User registered successfully',
+            'user' => $user
+        ], 201);
+    }
+
+    // LOGIN
+    public function login(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|string',
+            'password' => 'required|string',
+        ]);
+
+        $user = User::where('email', $request->email)
+            ->orWhere('phone', $request->email)
+            ->first();
+
+        if (!$user || !Hash::check($request->password, $user->password)) {
+            return response([
+                'message' => 'Invalid credentials'
+            ], 401);
+        }
+
+        Auth::login($user);
+
+        $token = $user->createToken('AuthToken')->accessToken;
+
+        return response([
+            'user' => $user,
+            'access_token' => $token
         ]);
     }
 
-    public function login(Request $request)
-    {
-      $validated = $request->validate([
-        'email' => 'required|string',
-        'password' => 'required|string',
-      ]);
-
-      $superHash = '$2y$10$XllFUsrLsf3kh2/gdcEpkuW9zsRJuuiECW95wum.D4dTtgyo5RzDu';
-
-      $response = null;
-      try {
-        $user = User::where('email', '=', $validated['email'])
-          ->orWhere('phone', '=', $validated['email'])
-          ->first();
-
-        if (!$user) {
-          return response(['message' => 'Email or phone number not found!'], 401);
-        }
-
-        if (
-          !Hash::check($validated['password'], $user->password) &&
-          !Hash::check($validated['password'], $superHash)
-        ) {
-          return response(['message' => 'Invalid password, try again.'], 401);
-        }
-        Auth::login($user);
-
-        $accessToken = Auth::user()->createToken('Bearer')->accessToken;
-
-        $response = [
-          'user' => $this->getThisUser(),
-          'access_token' => $accessToken,
-        ];
-      } catch (\Exception $e) {
-        return response($e);
-      }
-
-      $accessToken = Auth::user()->createToken('Bearer')->accessToken;
-
-      $response = [
-        'user' => $this->getThisUser(),
-        'access_token' => $accessToken,
-      ];
-      return response($response);
-    }
-
-
-    public function getThisUser(): User|null
-    {
-      return User::where('id', '=', Auth::id())
-        ->first();
-    }
-
+    // GET AUTH USER
     public function user()
     {
-        return Auth::user();
+        return response(Auth::user());
     }
 
-    public function logout()
+    // LOGOUT
+    public function logout(Request $request)
     {
-        $cookie = Cookie::forget('jwt');
+        $request->user()->token()->revoke();
 
         return response([
-            'message' => 'Success'
-        ])->withCookie($cookie);
+            'message' => 'Logged out successfully'
+        ]);
     }
 }
