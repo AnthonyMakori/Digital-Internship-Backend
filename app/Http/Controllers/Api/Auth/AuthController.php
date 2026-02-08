@@ -10,14 +10,21 @@ use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
-    // REGISTER
+    /*
+    |--------------------------------------------------------------------------
+    | REGISTER
+    |--------------------------------------------------------------------------
+    */
+
     public function register(Request $request)
     {
         $request->validate([
             'name' => 'required|string|max:255',
             'phone' => 'required|string|max:20|unique:users,phone',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|min:6',
+            'email' => 'required|email|max:255|unique:users,email',
+            'password' => 'required|string|min:6',
+            'role' => 'required|in:Student,Lecturer,Company',
+            'role_id' => 'required|string|max:100',
         ]);
 
         $user = User::create([
@@ -25,15 +32,22 @@ class AuthController extends Controller
             'phone' => $request->phone,
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            'role' => $request->role,
+            'role_id' => $request->role_id,
         ]);
 
-        return response([
+        return response()->json([
             'message' => 'User registered successfully',
             'user' => $user
         ], 201);
     }
 
-    // LOGIN
+    /*
+    |--------------------------------------------------------------------------
+    | LOGIN
+    |--------------------------------------------------------------------------
+    */
+
     public function login(Request $request)
     {
         $request->validate([
@@ -41,12 +55,13 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
+        // Allow login using email OR phone
         $user = User::where('email', $request->email)
             ->orWhere('phone', $request->email)
             ->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
-            return response([
+            return response()->json([
                 'message' => 'Invalid credentials'
             ], 401);
         }
@@ -55,24 +70,34 @@ class AuthController extends Controller
 
         $token = $user->createToken('AuthToken')->accessToken;
 
-        return response([
+        return response()->json([
             'user' => $user,
             'access_token' => $token
         ]);
     }
 
-    // GET AUTH USER
+    /*
+    |--------------------------------------------------------------------------
+    | GET AUTHENTICATED USER
+    |--------------------------------------------------------------------------
+    */
+
     public function user()
     {
-        return response(Auth::user());
+        return response()->json(Auth::user());
     }
 
-    // LOGOUT
+    /*
+    |--------------------------------------------------------------------------
+    | LOGOUT
+    |--------------------------------------------------------------------------
+    */
+
     public function logout(Request $request)
     {
         $request->user()->token()->revoke();
 
-        return response([
+        return response()->json([
             'message' => 'Logged out successfully'
         ]);
     }

@@ -8,6 +8,8 @@ return [
 
     'allowed_origins' => [
         'http://localhost:3000',
+            'http://localhost:8080',
+
     ],
 
     'allowed_origins_patterns' => [],
